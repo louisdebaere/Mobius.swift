@@ -17,7 +17,7 @@
 /// The resources can be anything; ranging from a network request, task on the CPU or an observation of another resource.
 ///
 /// See also `AnonymousDisposable` for a concrete anonymous implementation.
-public protocol Disposable: AnyObject {
+public protocol Disposable {
     /// Dispose of all resources associated with the `Disposable` object.
     ///
     /// The `Disposable` will no longer be valid after `dispose` has been called, and any further calls to `dispose`
