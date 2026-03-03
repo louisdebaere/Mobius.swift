@@ -1,7 +1,6 @@
 // Copyright Spotify AB.
 // SPDX-License-Identifier: Apache-2.0
 
-import Foundation
 import MobiusCore
 import Nimble
 import Quick
@@ -208,14 +207,14 @@ class EffectRouterDSLTests: QuickSpec {
                     return
                 }
 
-                let performedEffects = ThreadSafeBox<[Effect]>([])
+                let performedEffects = Recorder<Effect>()
                 var didDispatchEvents = false
                 let parameterExtractor: (Effect) -> Effect? = { $0 == .effect1 ? .effect1 : nil }
                 let dslHandler = EffectRouter<Effect, Event>()
                     .routeEffects(withParameters: parameterExtractor)
                     .on(queue: .main)
                     .to { @MainActor effect in
-                        performedEffects.mutate { $0.append(effect) }
+                        performedEffects.append(effect)
                     }
                     .asConnectable
                     .connect { _ in
@@ -223,7 +222,7 @@ class EffectRouterDSLTests: QuickSpec {
                     }
 
                 dslHandler.accept(.effect1)
-                expect { performedEffects.snapshot() }.toEventually(equal([.effect1]))
+                expect(performedEffects.items).toEventually(equal([.effect1]))
                 expect(didDispatchEvents).to(beFalse())
             }
 
@@ -250,14 +249,14 @@ class EffectRouterDSLTests: QuickSpec {
                     return
                 }
 
-                let effectPerformedCount = ThreadSafeBox(0)
+                let effectPerformedCount = Recorder<Int>()
                 var didDispatchEvents = false
                 let parameterExtractor: (Effect) -> Void? = { $0 == .effect1 ? () : nil }
                 let dslHandler = EffectRouter<Effect, Event>()
                     .routeEffects(withParameters: parameterExtractor)
                     .on(queue: .main)
                     .to { @MainActor in
-                        effectPerformedCount.mutate { $0 += 1 }
+                        effectPerformedCount.append(1)
                     }
                     .asConnectable
                     .connect { _ in
@@ -265,7 +264,7 @@ class EffectRouterDSLTests: QuickSpec {
                     }
 
                 dslHandler.accept(.effect1)
-                expect { effectPerformedCount.snapshot() }.toEventually(equal(1))
+                expect(effectPerformedCount.items).toEventually(equal([1]))
                 expect(didDispatchEvents).to(beFalse())
             }
 
@@ -322,26 +321,5 @@ private class EffectConnectable: Connectable {
             },
             disposeClosure: {}
         )
-    }
-}
-
-private final class ThreadSafeBox<Value>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value: Value
-
-    init(_ value: Value) {
-        self.value = value
-    }
-
-    func mutate(_ operation: (inout Value) -> Void) {
-        lock.lock()
-        defer { lock.unlock() }
-        operation(&value)
-    }
-
-    func snapshot() -> Value {
-        lock.lock()
-        defer { lock.unlock() }
-        return value
     }
 }
