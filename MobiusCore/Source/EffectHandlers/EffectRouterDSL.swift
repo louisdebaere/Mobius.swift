@@ -35,6 +35,25 @@ public extension _PartialEffectRouter {
         }
     }
 
+    /// Route to a `@MainActor` side-effecting closure.
+    ///
+    /// The compiler will choose this overload when the closure body touches `@MainActor`-isolated state.
+    ///
+    /// - Precondition: This route should be bound to `.main` with `.on(queue: .main)`. If not,
+    ///   `MainActor.assumeIsolated` traps at runtime.
+    @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+    func to(
+        _ fireAndForget: @MainActor @Sendable @escaping (EffectParameters) -> Void
+    ) -> EffectRouter<Effect, Event> {
+        return to { parameters, callback in
+            MainActor.assumeIsolated {
+                fireAndForget(parameters)
+            }
+            callback.end()
+            return AnonymousDisposable {}
+        }
+    }
+
     /// Route to a closure which returns an optional event when given the parameters as input.
     ///
     /// - Parameter eventClosure: a function which returns an optional event given some input. No events will be
@@ -45,6 +64,36 @@ public extension _PartialEffectRouter {
         return to { parameters, callback in
             if let event = eventClosure(parameters) {
                 callback.send(event)
+            }
+            callback.end()
+            return AnonymousDisposable {}
+        }
+    }
+}
+
+public extension _PartialEffectRouter where EffectParameters == Void {
+    /// Route to a side-effecting closure with no input parameters.
+    func to(
+        _ fireAndForget: @escaping () -> Void
+    ) -> EffectRouter<Effect, Event> {
+        return to { _, callback in
+            fireAndForget()
+            callback.end()
+            return AnonymousDisposable {}
+        }
+    }
+
+    /// Route to a `@MainActor` side-effecting closure with no input parameters.
+    ///
+    /// - Precondition: This route should be bound to `.main` with `.on(queue: .main)`. If not,
+    ///   `MainActor.assumeIsolated` traps at runtime.
+    @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+    func to(
+        _ fireAndForget: @MainActor @Sendable @escaping () -> Void
+    ) -> EffectRouter<Effect, Event> {
+        return to { _, callback in
+            MainActor.assumeIsolated {
+                fireAndForget()
             }
             callback.end()
             return AnonymousDisposable {}
